@@ -11,6 +11,7 @@ from pptx.enum.text import PP_PARAGRAPH_ALIGNMENT
 from pptx.util import Cm,Pt
 from pptx.dml.color import RGBColor
 from PIL import Image
+import math
 import os
 import copy
 
