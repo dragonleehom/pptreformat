@@ -15,6 +15,17 @@ import math
 import os
 import copy
 
+def process_txt_format(txt)
+    firsttxt=txt.replace(" ","").replace("\n","").replace("\r","")
+    print(firsttxt)
+    splittxt = re.split('[(|)]',firsttxt)
+    print(splittxt)
+    for eachword in splittxt:
+        eachword.replace(" ","")
+        if len(eachword )==0:
+            continue
+        print(eachword)
+    return splittxt
 
 def process_slide(slide_src):
     # 获取页面中的所有形状
