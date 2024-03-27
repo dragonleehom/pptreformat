@@ -5,8 +5,10 @@ from io import StringIO
 from pptx import Presentation
 from pptx.enum.shapes import MSO_SHAPE_TYPE
 from pptx.enum.text import MSO_AUTO_SIZE
+from pptx.enum.text import MSO_VERTICAL_ANCHOR
+from pptx.enum.text import PP_PARAGRAPH_ALIGNMENT
 
-from pptx.util import Cm
+from pptx.util import Cm,Pt
 from pptx.dml.color import RGBColor
 from PIL import Image
 import os
