@@ -24,7 +24,7 @@ def process_slide(slide_src):
         if shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
             # 处理图片
             #process_image(shape, slide_dst)
-            if shape.width >Cm(0.1) and shape.height > Cm(0.1):
+            if shape.width >Cm(0.1) and shape.height > Cm(0.1) and shape.height < prs_dst.slide_width:
                 slide_dst = prs_dst.slides.add_slide(blank_slide_layout)
 
                 imdata = shape.image.blob
@@ -36,43 +36,61 @@ def process_slide(slide_src):
                 file_str.write(imdata)
                 file_str.close()
 
-                new_shape_width=shape.width*3
-                new_shape_height=shape.height*3
-                new_shape_top=prs_dst.slide_width/4-new_shape_height/2
-                new_shape_left=prs_dst.slide_width/4-new_shape_width/2
+                new_image_width=shape.width*3
+                new_image_height=shape.height*3
+                new_image_top=(prs_dst.slide_height/2)-(new_image_height/2)
+                new_image_left=(prs_dst.slide_width/4)-(new_image_width/2)
+                print("****slide size:",prs_dst.slide_width/360000,prs_dst.slide_height/360000)
+                print("****add picture:",new_image_height/360000,new_image_width/360000,new_image_top/360000,new_image_left/360000)
                 
-                new_shape = slide_dst.shapes.add_picture(image_file,new_shape_top,new_shape_left,new_shape_width,new_shape_height)
-
-                gap_width=0
-                gap_height=0
+                new_shape = slide_dst.shapes.add_picture(image_file,new_image_left,new_image_top,new_image_width,new_image_height)
+ 
+                gap_left = 0
+                gap_top  = 0
+                gap_distance =0
 
                 txBox = slide_dst.shapes.add_textbox(prs_dst.slide_width/2,0,prs_dst.slide_width/2,prs_dst.slide_height)
                 tf = txBox.text_frame
                 tf.word_wrap = False
                 tf.auto_size = MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE
-                #tf.fit_text(font_family='Calibri', max_size=72, bold=False, italic=False, font_file=None)
+                tf.vertical_anchor = MSO_VERTICAL_ANCHOR.MIDDLE
+                p = tf.add_paragraph()
+                p.alignment = PP_PARAGRAPH_ALIGNMENT.CENTER
+                p.font.name="Calibri"
+                p.font.size=Pt(48)
+                #tf.fit_text(font_family='Calibri', max_size=72, bold=True, italic=False, font_file=None)
 
-                print("tf lenth:",len(tf.text))
-                for shape_text in shapes:
-                    print("----",shape_text.name,"--",shape_text.shape_type)
-                    #if shape_text.shape_type == MSO_SHAPE_TYPE.TEXT_BOX:
-                    if shape_text.has_text_frame:
-                        print("---- start to copy content")
-                        if len(tf.text)==0:
-                            gap_width=abs(shape_text.left - shape.left)
-                            gap_height=abs(shape_text.top-shape.top)
-                            tf.text = shape_text.text_frame.text
-                            print("----this is the first time",shape_text.text_frame.text)
+                print("----start to match word ",len(p.text))
+                for textShape in shapes:
+                    print("--------",textShape.name,"----",textShape.shape_type)
+                    if textShape.has_text_frame:
+                        print("------------text:",textShape.text_frame.text)
+                        if (textShape.left-shape.left)<0:
+                            print("------------continue:",textShape.left-shape.left,textShape.top-shape.top)
+                            continue
+                        print("----------------start to copy content----")
+                        if len(p.text) == 0:
+                            gap_left=textShape.left-shape.left
+                            gap_top=abs(textShape.top - shape.top)
+                            gap_distance = math.sqrt((textShape.left-shape.left)**2+(textShape.top-shape.top)**2)
+                            p.text = textShape.text_frame.text
+                            print("--------------------this is the first time----",gap_left,gap_top,gap_distance)
                         else:
-                            if gap_width>abs(shape_text.left - shape.left) and gap_height>abs(shape_text.top-shape.top):
-                                print("----find closer one",shape_text.text_frame.text)
-                                gap_width=abs(shape_text.left - shape.left)
-                                gap_height=abs(shape_text.top-shape.top)
-                                if len(shape_text.text_frame.text)>0:
-                                    tf.text = shape_text.text_frame.text
-                        
+                            tmp_gap_left=textShape.left - shape.left
+                            tmp_gap_top=abs(textShape.top - shape.top)
+                            tmp_gap_distance=math.sqrt((textShape.left-shape.left)**2+(textShape.top-shape.top)**2)
+                            print("--------------------tmp gap----",gap_left,tmp_gap_left,gap_top,tmp_gap_top,gap_distance,tmp_gap_distance)
+                            if gap_distance>tmp_gap_left and gap_top>tmp_gap_top and tmp_gap_left>0:
+                                print("--------------------find closer one----",textShape.text_frame.text)
+                                if len(textShape.text_frame.text)>0:
+                                    gap_left=tmp_gap_left
+                                    gap_top=tmp_gap_top
+                                    gap_distance=tmp_gap_distance
+                                    p.text=textShape.text_frame.text
+                print("----end matching word",p.text)
 
- 
+
+
          
         # elif shape.shape_type == MSO_SHAPE_TYPE.LINE
         #     shapes.element.remove(shape.element)
