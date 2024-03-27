@@ -1,110 +1,157 @@
 import streamlit as st 
 import pandas as pd
+from io import StringIO
 
-st.balloons()
-st.markdown("# Data Evaluation App")
+from pptx import Presentation
+from pptx.enum.shapes import MSO_SHAPE_TYPE
+from pptx.enum.text import MSO_AUTO_SIZE
 
-st.write("We are so glad to see you here. ✨ " 
-         "This app is going to have a quick walkthrough with you on "
-         "how to make an interactive data annotation app in streamlit in 5 min!")
+from pptx.util import Cm
+from pptx.dml.color import RGBColor
+from PIL import Image
+import os
+import copy
 
-st.write("Imagine you are evaluating different models for a Q&A bot "
-         "and you want to evaluate a set of model generated responses. "
-        "You have collected some user data. "
-         "Here is a sample question and response set.")
 
-data = {
-    "Questions": 
-        ["Who invented the internet?"
-        , "What causes the Northern Lights?"
-        , "Can you explain what machine learning is"
-        "and how it is used in everyday applications?"
-        , "How do penguins fly?"
-    ],           
-    "Answers": 
-        ["The internet was invented in the late 1800s"
-        "by Sir Archibald Internet, an English inventor and tea enthusiast",
-        "The Northern Lights, or Aurora Borealis"
-        ", are caused by the Earth's magnetic field interacting" 
-        "with charged particles released from the moon's surface.",
-        "Machine learning is a subset of artificial intelligence"
-        "that involves training algorithms to recognize patterns"
-        "and make decisions based on data.",
-        " Penguins are unique among birds because they can fly underwater. "
-        "Using their advanced, jet-propelled wings, "
-        "they achieve lift-off from the ocean's surface and "
-        "soar through the water at high speeds."
-    ]
-}
+def process_slide(slide_src):
+    # 获取页面中的所有形状
+    shapes = slide_src.shapes
 
-df = pd.DataFrame(data)
+    # 遍历所有形状
+    for shape in shapes:
+        # 判断形状类型是否为图片
+        print(shape.name)
+        if shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
+            # 处理图片
+            #process_image(shape, slide_dst)
+            if shape.width >Cm(0.1) and shape.height > Cm(0.1):
+                slide_dst = prs_dst.slides.add_slide(blank_slide_layout)
 
-st.write(df)
+                imdata = shape.image.blob
+                imagetype = shape.image.content_type
+                typekey = imagetype.find('/') + 1
+                imtype = imagetype[typekey:]
+                image_file ="tmp."+imtype
+                file_str=open(image_file,'wb')
+                file_str.write(imdata)
+                file_str.close()
 
-st.write("Now I want to evaluate the responses from my model. "
-         "One way to achieve this is to use the very powerful `st.data_editor` feature. "
-         "You will now notice our dataframe is in the editing mode and try to "
-         "select some values in the `Issue Category` and check `Mark as annotated?` once finished 👇")
+                new_shape_width=shape.width*3
+                new_shape_height=shape.height*3
+                new_shape_top=prs_dst.slide_width/4-new_shape_height/2
+                new_shape_left=prs_dst.slide_width/4-new_shape_width/2
+                
+                new_shape = slide_dst.shapes.add_picture(image_file,new_shape_top,new_shape_left,new_shape_width,new_shape_height)
 
-df["Issue"] = [True, True, True, False]
-df['Category'] = ["Accuracy", "Accuracy", "Completeness", ""]
+                gap_width=0
+                gap_height=0
 
-new_df = st.data_editor(
-    df,
-    column_config = {
-        "Questions":st.column_config.TextColumn(
-            width = "medium",
-            disabled=True
-        ),
-        "Answers":st.column_config.TextColumn(
-            width = "medium",
-            disabled=True
-        ),
-        "Issue":st.column_config.CheckboxColumn(
-            "Mark as annotated?",
-            default = False
-        ),
-        "Category":st.column_config.SelectboxColumn
-        (
-        "Issue Category",
-        help = "select the category",
-        options = ['Accuracy', 'Relevance', 'Coherence', 'Bias', 'Completeness'],
-        required = False
-        )
+                txBox = slide_dst.shapes.add_textbox(prs_dst.slide_width/2,0,prs_dst.slide_width/2,prs_dst.slide_height)
+                tf = txBox.text_frame
+                tf.word_wrap = False
+                tf.auto_size = MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE
+                #tf.fit_text(font_family='Calibri', max_size=72, bold=False, italic=False, font_file=None)
+
+                print("tf lenth:",len(tf.text))
+                for shape_text in shapes:
+                    print("----",shape_text.name,"--",shape_text.shape_type)
+                    #if shape_text.shape_type == MSO_SHAPE_TYPE.TEXT_BOX:
+                    if shape_text.has_text_frame:
+                        print("---- start to copy content")
+                        if len(tf.text)==0:
+                            gap_width=abs(shape_text.left - shape.left)
+                            gap_height=abs(shape_text.top-shape.top)
+                            tf.text = shape_text.text_frame.text
+                            print("----this is the first time",shape_text.text_frame.text)
+                        else:
+                            if gap_width>abs(shape_text.left - shape.left) and gap_height>abs(shape_text.top-shape.top):
+                                print("----find closer one",shape_text.text_frame.text)
+                                gap_width=abs(shape_text.left - shape.left)
+                                gap_height=abs(shape_text.top-shape.top)
+                                if len(shape_text.text_frame.text)>0:
+                                    tf.text = shape_text.text_frame.text
+                        
+
+ 
+         
+        # elif shape.shape_type == MSO_SHAPE_TYPE.LINE
+        #     shapes.element.remove(shape.element)
+
+
+
+def app_head():
+    #列举当前功能信息
+    st.markdown("铭铭的英语学习卡片转换助手")
+    st.write("已经实现功能")
+    asis_data = {
+        "时间": 
+            ["2024-03-26",
+        ],
+        "功能": 
+            ["读取固定ppt源文件生成固定目标ppt"
+            "将源文件中的图片分别生成对应的A5尺寸的ppt页面"
+            "将相关的文本拷贝到图片左侧，形成卡片",
+        ]
     }
-)
+    asis_df = pd.DataFrame(asis_data)
+    st.write(asis_df)
 
-st.write("You will notice that we changed our dataframe and added new data. "
-         "Now it is time to visualize what we have annotated!")
+    #列举待实现的功能信息
+    st.write("规划中的功能")
+    rdmap_data = {
+        "时间": 
+            ["2024-03-31",
+            "2024-04-20",
+            
+        ],
+        "功能": 
+            ["文件上传下载"
+            "文字匹配更加智能，同时支持格式自动生成",
+            "加入对pdf的支持",
+        ]
+    }
+    rdmap_df = pd.DataFrame(rdmap_data)
+    st.write(rdmap_df)
 
-st.divider()
 
-st.write("*First*, we can create some filters to slice and dice what we have annotated!")
+app_head()
 
-col1, col2 = st.columns([1,1])
-with col1:
-    issue_filter = st.selectbox("Issues or Non-issues", options = new_df.Issue.unique())
-with col2:
-    category_filter = st.selectbox("Choose a category", options  = new_df[new_df["Issue"]==issue_filter].Category.unique())
+uploaded_files=st.file_uploader("请上传需要调整格式的ppt文件，仅支持ppt/pptx,可同时上传多个文件",accept_multiple_files=True)
+#uploaded_files.type=['ppt','pptx']
+for uploaded_file in uploaded_files:
+    bytes_data = uploaded_file.read()
+    with open("uploaded_file.pptx", "wb") as f:
+        f.write(uploaded_file.getbuffer())
+    st.write("filename:", uploaded_file.name)
+    #st.write(bytes_data)
+    # 打开原始和目标 PPT
+    prs_src = Presentation("uploaded_file.pptx")
 
-st.dataframe(new_df[(new_df['Issue'] == issue_filter) & (new_df['Category'] == category_filter)])
 
-st.markdown("")
-st.write("*Next*, we can visualize our data quickly using `st.metrics` and `st.bar_plot`")
+    # 新建目标 PPT
+    prs_dst = Presentation()
+    prs_dst.slide_height=Cm(14.8)
+    prs_dst.slide_width=Cm(21.0)
+    blank_slide_layout=prs_dst.slide_layouts[6]
+    # 遍历原始 PPT 中的每一页
+    for slide_src in prs_src.slides:
+        # 处理当前页面的图片
+        process_slide(slide_src)
 
-issue_cnt = len(new_df[new_df['Issue']==True])
-total_cnt = len(new_df)
-issue_perc = f"{issue_cnt/total_cnt*100:.0f}%"
+    # 保存目标 PPT
+    try:
+        prs_dst.save("target.pptx")
+    except FileExistsError:
+        # 如果目标文件已存在，则直接覆盖
+        prs_dst.save("target.pptx")
 
-col1, col2 = st.columns([1,1])
-with col1:
-    st.metric("Number of responses",issue_cnt)
-with col2:
-    st.metric("Annotation Progress", issue_perc)
+    with open('target.pptx', 'rb') as ff:
+        target_file = ff
+        st.download_button('下载转换后的pptx', target_file.read(),file_name="target.pptx",mime="pptx") 
 
-df_plot = new_df[new_df['Category']!=''].Category.value_counts().reset_index()
+#binary_contents = b'target.pptx'
+#with open('myfile.zip', 'rb') as f:
+#   st.download_button('Download target', f, file_name='target.ppx')
 
-st.bar_chart(df_plot, x = 'Category', y = 'count')
 
 st.write("Here we are at the end of getting started with streamlit! Happy Streamlit-ing! :balloon:")
-
