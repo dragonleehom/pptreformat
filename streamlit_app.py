@@ -12,19 +12,21 @@ from pptx.util import Cm,Pt
 from pptx.dml.color import RGBColor
 from PIL import Image
 import math
+import re
 import os
 import copy
 
-def process_txt_format(txt)
-    firsttxt=txt.replace(" ","").replace("\n","").replace("\r","")
-    print(firsttxt)
-    splittxt = re.split('[(|)]',firsttxt)
+def process_txt_format(unformated_text):
+    print("-------------processing format of text",unformated_text)
+    txt_remove_space=unformated_text.replace(" ","").replace("\n","").replace("\r","")
+    print(txt_remove_space)
+    splittxt = re.split('[(|)|（|）]',txt_remove_space)
     print(splittxt)
     for eachword in splittxt:
-        eachword.replace(" ","")
-        if len(eachword )==0:
-            continue
         print(eachword)
+        if len(eachword)==0:
+            splittxt.remove(eachword)
+            continue
     return splittxt
 
 def process_slide(slide_src):
@@ -61,47 +63,112 @@ def process_slide(slide_src):
  
                 gap_left = 0
                 gap_top  = 0
+                latest_left=0
+                latest_top=0
                 gap_distance =0
 
                 txBox = slide_dst.shapes.add_textbox(prs_dst.slide_width/2,0,prs_dst.slide_width/2,prs_dst.slide_height)
                 tf = txBox.text_frame
-                tf.word_wrap = False
+                tf.word_wrap = True
                 tf.auto_size = MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE
                 tf.vertical_anchor = MSO_VERTICAL_ANCHOR.MIDDLE
-                p = tf.add_paragraph()
-                p.alignment = PP_PARAGRAPH_ALIGNMENT.CENTER
-                p.font.name="Calibri"
-                p.font.size=Pt(48)
+                tf.clear()
+                
                 #tf.fit_text(font_family='Calibri', max_size=72, bold=True, italic=False, font_file=None)
-
-                print("----start to match word ",len(p.text))
+                tmp_target_text=""
+                print("----start to match word ")
                 for textShape in shapes:
-                    print("--------",textShape.name,"----",textShape.shape_type)
-                    if textShape.has_text_frame:
-                        print("------------text:",textShape.text_frame.text)
-                        if (textShape.left-shape.left)<0:
-                            print("------------continue:",textShape.left-shape.left,textShape.top-shape.top)
-                            continue
+                    print("--------",textShape.name,"----",textShape.shape_type,textShape)
+                    if textShape.has_text_frame or textShape.shape_type==MSO_SHAPE_TYPE.TABLE:
+                        
+                        #if (textShape.left-shape.left)<0:
+                        if textShape.has_text_frame:
+                            print("------------text:",textShape.text_frame.text,textShape)
+                            if textShape.text_frame.text.find("磨出好耳朵")!=-1:
+                                print("------------continue:",textShape.left-shape.left,textShape.top-shape.top)
+                                continue
                         print("----------------start to copy content----")
-                        if len(p.text) == 0:
-                            gap_left=textShape.left-shape.left
-                            gap_top=abs(textShape.top - shape.top)
-                            gap_distance = math.sqrt((textShape.left-shape.left)**2+(textShape.top-shape.top)**2)
-                            p.text = textShape.text_frame.text
+                        if len(tmp_target_text) == 0:
+                            if textShape.shape_type == MSO_SHAPE_TYPE.TABLE:
+                                cellindex=0
+                                for col in textShape.columns:
+                                    eachcell = textShape.cell(0,col)
+                                    if len(eachcell.text)==0:
+                                        cellindex+=1
+                                        continue
+                                    latest_top = textShape.top
+                                    latest_left = textShape.left+cellindex*textShape.column[0].width
+                                    if gap_distance == 0:
+                                        gap_distance = math.sqrt((latest_left-shape.left)**2+(latest_top-shape.top)**2)
+                                        tmp_target_text = eachcard.text
+                                    elif gap_distance >math.sqrt((latest_left-shape.left)**2+(latest_top-shape.top)**2):
+                                        gap_distance = math.sqrt((latest_left-shape.left)**2+(latest_top-shape.top)**2)
+                                        tmp_target_text = eachcard.text
+                                    cellindex+=1
+                            else:            
+                                gap_left=textShape.left-shape.left
+                                gap_top=abs(textShape.top - shape.top)
+                                gap_distance = math.sqrt((textShape.left-shape.left)**2+(textShape.top-shape.top)**2)
+                                tmp_target_text = textShape.text_frame.text
                             print("--------------------this is the first time----",gap_left,gap_top,gap_distance)
                         else:
-                            tmp_gap_left=textShape.left - shape.left
-                            tmp_gap_top=abs(textShape.top - shape.top)
-                            tmp_gap_distance=math.sqrt((textShape.left-shape.left)**2+(textShape.top-shape.top)**2)
-                            print("--------------------tmp gap----",gap_left,tmp_gap_left,gap_top,tmp_gap_top,gap_distance,tmp_gap_distance)
-                            if gap_distance>tmp_gap_left and gap_top>tmp_gap_top and tmp_gap_left>0:
-                                print("--------------------find closer one----",textShape.text_frame.text)
-                                if len(textShape.text_frame.text)>0:
-                                    gap_left=tmp_gap_left
-                                    gap_top=tmp_gap_top
-                                    gap_distance=tmp_gap_distance
-                                    p.text=textShape.text_frame.text
-                print("----end matching word",p.text)
+                            if textShape.shape_type == MSO_SHAPE_TYPE.TABLE:
+                                cellindex=0
+                                for col in textShape.columns:
+                                    eachcell = textShape.cell(0,col)
+                                    if len(eachcell.text)==0:
+                                        cellindex+=1
+                                        continue
+                                    latest_top = textShape.top
+                                    latest_left = textShape.left+cellindex*textShape.column[0].width
+                                    if gap_distance >math.sqrt((latest_left-shape.left)**2+(latest_top-shape.top)**2):
+                                        gap_distance = math.sqrt((latest_left-shape.left)**2+(latest_top-shape.top)**2)
+                                        tmp_target_text = eachcard.text
+                                    cellindex+=1
+                            else:   
+                                tmp_gap_left=textShape.left - shape.left
+                                tmp_gap_top=abs(textShape.top - shape.top)
+                                tmp_gap_distance=math.sqrt((textShape.left-shape.left)**2+(textShape.top-shape.top)**2)
+                                print("--------------------tmp gap----",gap_left,tmp_gap_left,gap_top,tmp_gap_top,gap_distance,tmp_gap_distance)
+                                if gap_distance>tmp_gap_distance:
+                                    print("--------------------find closer one----",textShape.text_frame.text)
+                                    if len(textShape.text_frame.text)>0:
+                                        gap_left=tmp_gap_left
+                                        gap_top=tmp_gap_top
+                                        gap_distance=tmp_gap_distance
+                                        tmp_target_text=textShape.text_frame.text
+                
+                #规范化字符
+                cardwordlist= process_txt_format(tmp_target_text)
+
+                i=0
+                for eachcard in cardwordlist:
+                    if i==0:
+                        p = tf.add_paragraph()
+                        p.alignment = PP_PARAGRAPH_ALIGNMENT.CENTER
+                        p.text = eachcard
+                        p.font.name="Calibri"
+                        p.font.bold=True
+                        p.font.size=Pt(80)
+                    elif i==1:
+                        p = tf.add_paragraph()
+                        p.alignment = PP_PARAGRAPH_ALIGNMENT.CENTER
+                        p.text = "(" + eachcard + ")"
+                        p.font.name="微软雅黑"
+                        p.font.bold=False
+                        p.font.size=Pt(36)
+                    elif i==2:
+                        p = tf.add_paragraph()
+                        p.alignment = PP_PARAGRAPH_ALIGNMENT.CENTER
+                        p.text = eachcard
+                        p.font.name="微软雅黑"
+                        p.font.bold=False
+                        p.font.size=Pt(36)
+                    else:
+                        print("---------Abnormal text-----",eachcard,i)
+                    i+=1
+
+                print("----end matching word")
 
 
 
@@ -150,16 +217,18 @@ app_head()
 
 uploaded_files=st.file_uploader("请上传需要调整格式的ppt文件，仅支持ppt/pptx,可同时上传多个文件",accept_multiple_files=True)
 #uploaded_files.type=['ppt','pptx']
+uploaded_file_name=""
 for uploaded_file in uploaded_files:
     bytes_data = uploaded_file.read()
-    with open("uploaded_file.pptx", "wb") as f:
+    uploaded_file_name=uploaded_file.name
+    with open(uploaded_file_name, "wb") as f:
         f.write(uploaded_file.getbuffer())
-    st.write("filename:", uploaded_file.name)
+    st.write("filename:", uploaded_file_name)
     #st.write(bytes_data)
     # 打开原始和目标 PPT
-    prs_src = Presentation("uploaded_file.pptx")
+    prs_src = Presentation(uploaded_file_name)
 
-
+    target_file_name = "转换后-" + uploaded_file_name
     # 新建目标 PPT
     prs_dst = Presentation()
     prs_dst.slide_height=Cm(14.8)
@@ -172,14 +241,14 @@ for uploaded_file in uploaded_files:
 
     # 保存目标 PPT
     try:
-        prs_dst.save("target.pptx")
+        prs_dst.save(target_file_name)
     except FileExistsError:
         # 如果目标文件已存在，则直接覆盖
-        prs_dst.save("target.pptx")
+        prs_dst.save(target_file_name)
 
-    with open('target.pptx', 'rb') as ff:
+    with open(target_file_name, 'rb') as ff:
         target_file = ff
-        st.download_button('下载转换后的pptx', target_file.read(),file_name="target.pptx",mime="pptx") 
+        st.download_button('下载转换后的pptx', target_file.read(),file_name=target_file_name,mime="pptx") 
 
 #binary_contents = b'target.pptx'
 #with open('myfile.zip', 'rb') as f:
